@@ -1,0 +1,131 @@
+# Number Of the Conteiners
+replicaCount: 1
+
+# If cronjob true set enabled with false, but by default auto set to false
+hpa:
+  enabled: false
+  minReplicas: 3
+  maxReplicas: 9
+  memory_max: 80
+  cpu_max: 80
+
+rollingUpdate:
+  enabled: true
+  maxSurge: 1
+  maxUnavailable: 0
+
+image:
+  repository: 740561009084.dkr.ecr.us-east-1.amazonaws.com/your-ms-name
+  tag: stable
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  annotations:
+    prometheus.io/scrape: "true"
+  ports:
+    http:
+      protocol: TCP
+      port: 80
+      targetPort: 3100
+
+#if you need AWS internal ElasticLoadBalancer use this
+#service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+
+# If cronjob true set enabled with false, but by default auto set to false
+ingress:
+  enabled: false
+  annotations:
+    # TO DEVELOPMENT USE:
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:740561009084:certificate/3838812b-bcc3-4830-b2c8-e7340ee0f7e7"
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    # alb.ingress.kubernetes.io/scheme: internal
+    # alb.ingress.kubernetes.io/target-type: instance
+    # alb.ingress.kubernetes.io/group.name: alb-dev
+
+    # TO STAGING USE:
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:740561009084:certificate/2d506076-d483-4e4a-8f19-46f99688f292"
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    # alb.ingress.kubernetes.io/scheme: internal
+    # alb.ingress.kubernetes.io/target-type: instance
+    # alb.ingress.kubernetes.io/group.name: alb-st
+
+    kubernetes.io/ingress.class: nginx
+  paths:
+    - /
+  pathType: ImplementationSpecific
+  # pathType: Prefix
+  portName: http
+  # portName: https
+  hosts:
+    - test.elven.works
+
+resources:
+  limits:
+    cpu: 75m
+    memory: 192Mi
+  requests:
+    cpu: 50m
+    memory: 144Mi
+
+livenessProbe:
+  enabled: false
+  path: /health
+  port: http
+  scheme: HTTP
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: false
+  path: /health
+  port: http
+  scheme: HTTP
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+nodeSelector: {}
+#   environment: production
+tolerations: []
+
+affinity: {}
+
+applicationConfig: {}
+
+### Deprecated
+env: {}
+# ENV: valor
+
+ssm: {}
+# config:
+#   secretManagerName: development
+#   serviceAccount: ms
+# secrets:
+#   node_env: node_env_alias
+#   server_host: server_host_alias
+#   server_port: server_port_alias
+#   logger_level: logger_level_alias
+#   new_relic_app_name: new_relic_app_name_alias
+#   region: region_alias
+#   kong_url: kong_url_alias
+#   # username: username_alias
+#   # password: password_alias
+
+cronjob:
+  enabled: false
+  schedule: "*/10 * * * *"
+  restartPolicy: OnFailure
+  # startingDeadlineSeconds: 60
+  containers:
+    name: 1p-chart

@@ -1,0 +1,13 @@
+{{- if .Values.applicationConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    chart: {{ .Release.Name  }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  application.yml: {{ .Values.applicationConfig | quote }}
+{{- end }}
