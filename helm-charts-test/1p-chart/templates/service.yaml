@@ -1,0 +1,23 @@
+{{- if not .Values.cronjob.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+{{ include "Commons.Labels" . | indent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    {{- range $key, $value := .Values.service.ports }}   
+    - name: {{ $key }}   
+    {{-  range $k, $v :=  $value }}
+      {{ $k }} : {{ . }}
+    {{- end }}  
+    {{- end }}
+  selector:
+{{ include "Selector.Labels" . | indent 4 }}
+{{- end }}

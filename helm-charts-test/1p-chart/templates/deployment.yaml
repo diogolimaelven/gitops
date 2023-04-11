@@ -1,0 +1,129 @@
+{{- if not .Values.cronjob.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+{{ include "Commons.Labels" . | indent 4 }}
+spec:
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  {{- if .Values.rollingUpdate.enabled }}
+  strategy:
+    rollingUpdate:
+      maxSurge: {{ .Values.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.rollingUpdate.maxUnavailable }}
+    type: RollingUpdate
+  {{- end }}
+  selector:
+    matchLabels:
+{{ include "Selector.Labels" . | indent 6 }}
+  template:
+    metadata:
+    {{- if .Values.applicationConfig }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    {{- end }}
+      labels:
+{{ include "Selector.Labels" . | indent 8 }}
+    spec:
+    {{- if .Values.ssm.secrets }}
+      volumes:
+        - name: {{ .Release.Name }}
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Release.Name }}
+      serviceAccountName: {{ .Values.ssm.config.serviceAccount }}
+    {{- end }}
+      containers:
+        - name: {{ .Release.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- $secretName := .Release.Name -}}
+        {{- if .Values.env }}
+          env:
+          {{- range $key, $val := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.ssm.secrets }}
+          env:
+          {{- range $key, $val := .Values.ssm.secrets }}
+            - name: {{ $key | upper  }}
+              valueFrom:
+                secretKeyRef:
+                  name:  {{ $secretName }}
+                  key: {{ $key }}
+          {{- end }}
+          volumeMounts:
+            - name: {{ $secretName }}
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+        {{- end }}
+          ports:
+            {{- range $key, $value := .Values.service.ports }}   
+            - name: {{ $key }}   
+            {{-  range $k, $v :=  $value }}
+              {{- if eq $k "targetPort" -}}containerPort: {{ . }}{{ end }}
+              {{- if eq $k "protocol" -}}{{ $k }} : {{ . }}
+              {{ else }}  
+              {{ end }}
+            {{- end }}  
+            {{- end }}
+          {{- if .Values.livenessProbe.enabled }}          
+          livenessProbe:
+            {{- if eq .Values.livenessProbe.scheme "HTTP"}}
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              port: {{ .Values.livenessProbe.port }}
+              scheme: {{ .Values.livenessProbe.scheme }}
+            {{- end }}
+            {{- if eq .Values.livenessProbe.scheme "TCP"}}    
+            tcpSocket:               
+              port: {{ .Values.livenessProbe.port }}                
+            {{- end }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            {{- if eq .Values.livenessProbe.scheme "HTTP"}}
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              port: {{ .Values.livenessProbe.port }}
+              scheme: {{ .Values.livenessProbe.scheme }}
+            {{- end }}
+            {{- if eq .Values.livenessProbe.scheme "TCP"}}    
+            tcpSocket:               
+              port: {{ .Values.livenessProbe.port }}                
+            {{- end }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          securityContext:
+            privileged: false
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+{{- end }}
